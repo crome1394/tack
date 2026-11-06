@@ -3,6 +3,7 @@
 pub mod actions;
 pub mod doc;
 pub mod effects;
+pub mod ring;
 pub mod shapes;
 pub mod state;
 pub mod toolbar;
@@ -13,6 +14,7 @@ use crate::{clipboard, image_io};
 use actions::Ctx;
 use doc::{Doc, Rgba, Tool};
 use gtk::{gdk, gio, glib, prelude::*};
+use ring::{Pick, Ring};
 use state::Editor;
 use std::cell::{Cell, RefCell};
 use std::process::ExitCode;
@@ -167,7 +169,7 @@ fn build(app: &gtk::Application, editor: Editor) {
     syncing.set(true);
     let bar = Rc::new(Toolbar::new(&editor.borrow(), send.clone()));
     syncing.set(false);
-    bar.widget.set_visible(!hide_bars);
+    bar.set_visible(!hide_bars);
     *bar_slot.borrow_mut() = Some(bar.clone());
 
     {
@@ -193,14 +195,49 @@ fn build(app: &gtk::Application, editor: Editor) {
     connect_keys(&window, &canvas, &editor, &ctx, &refresh, &bar, &space_held);
 
     let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    layout.append(&bar.widget);
+    layout.append(&bar.top);
     layout.append(&canvas);
+    layout.append(&bar.bottom);
     window.set_child(Some(&layout));
     if fullscreen {
         window.fullscreen();
     }
     window.present();
     canvas.grab_focus();
+}
+
+/// A color from the ring, or the full chooser for the palette node.
+fn apply_pick(ctx: &Ctx, refresh: &Rc<dyn Fn()>, pick: Pick) {
+    match pick {
+        Pick::Color(c) => {
+            let mut e = ctx.editor.borrow_mut();
+            if !same_color(e.color, c) {
+                e.set_color(c);
+            }
+        }
+        Pick::Chooser => {
+            let c = ctx.editor.borrow().color;
+            let current = gdk::RGBA::new(c.r as f32, c.g as f32, c.b as f32, c.a as f32);
+            let (editor, refresh) = (ctx.editor.clone(), refresh.clone());
+            gtk::ColorDialog::new().choose_rgba(
+                Some(&ctx.window),
+                Some(&current),
+                gio::Cancellable::NONE,
+                move |result| {
+                    if let Ok(rgba) = result {
+                        let picked = Rgba {
+                            r: rgba.red() as f64,
+                            g: rgba.green() as f64,
+                            b: rgba.blue() as f64,
+                            a: rgba.alpha() as f64,
+                        };
+                        editor.borrow_mut().set_color(picked);
+                        refresh();
+                    }
+                },
+            );
+        }
+    }
 }
 
 fn same_color(a: Rgba, b: Rgba) -> bool {
@@ -240,19 +277,29 @@ fn connect_pointer(
     pointer: &Rc<Cell<(f64, f64)>>,
     space_held: &Rc<Cell<bool>>,
 ) {
-    // Left button: the current tool, or a pan while Space is held.
+    // Left button: the current tool, or a pan while Space is held. While
+    // the color ring is open, a click picks from it instead.
     let drag = gtk::GestureDrag::new();
     drag.set_button(gdk::BUTTON_PRIMARY);
+    let ring_click = Rc::new(Cell::new(false));
     {
-        let (editor, refresh, space_held, canvas) = (
+        let (editor, refresh, space_held, canvas, ctx, ring_click) = (
             editor.clone(),
             refresh.clone(),
             space_held.clone(),
             canvas.clone(),
+            ctx.clone(),
+            ring_click.clone(),
         );
         drag.connect_drag_begin(move |_, x, y| {
             canvas.grab_focus();
-            if space_held.get() {
+            let ring = editor.borrow_mut().ring.take();
+            ring_click.set(ring.is_some());
+            if let Some(ring) = ring {
+                if let Some(pick) = ring.node_at(x, y).and_then(|i| ring.pick(i)) {
+                    apply_pick(&ctx, &refresh, pick);
+                }
+            } else if space_held.get() {
                 editor.borrow_mut().begin_pan(x, y);
             } else {
                 editor.borrow_mut().press(x, y);
@@ -261,8 +308,11 @@ fn connect_pointer(
         });
     }
     {
-        let (editor, refresh) = (editor.clone(), refresh.clone());
+        let (editor, refresh, ring_click) = (editor.clone(), refresh.clone(), ring_click.clone());
         drag.connect_drag_update(move |g, dx, dy| {
+            if ring_click.get() {
+                return;
+            }
             if let Some((x, y)) = g.start_point() {
                 let square = g
                     .current_event_state()
@@ -274,8 +324,11 @@ fn connect_pointer(
         });
     }
     {
-        let (editor, refresh) = (editor.clone(), refresh.clone());
+        let (editor, refresh, ring_click) = (editor.clone(), refresh.clone(), ring_click.clone());
         drag.connect_drag_end(move |g, dx, dy| {
+            if ring_click.replace(false) {
+                return;
+            }
             if let Some((x, y)) = g.start_point() {
                 let square = g
                     .current_event_state()
@@ -287,31 +340,59 @@ fn connect_pointer(
     }
     canvas.add_controller(drag);
 
-    // Middle button pans.
-    let pan = gtk::GestureDrag::new();
-    pan.set_button(gdk::BUTTON_MIDDLE);
+    // Middle button: the color ring. Release over a color to pick it;
+    // release without moving to leave the ring open for a click.
+    let middle = gtk::GestureDrag::new();
+    middle.set_button(gdk::BUTTON_MIDDLE);
     {
-        let editor = editor.clone();
-        pan.connect_drag_begin(move |_, x, y| editor.borrow_mut().begin_pan(x, y));
+        let (editor, refresh, canvas) = (editor.clone(), refresh.clone(), canvas.clone());
+        middle.connect_drag_begin(move |_, x, y| {
+            let (w, h) = (canvas.width() as f64, canvas.height() as f64);
+            let mut e = editor.borrow_mut();
+            let palette = e.settings.palette.clone();
+            e.ring = Some(Ring::new(x, y, &palette, w, h));
+            drop(e);
+            refresh();
+        });
     }
     {
         let (editor, refresh) = (editor.clone(), refresh.clone());
-        pan.connect_drag_update(move |g, dx, dy| {
-            if let Some((x, y)) = g.start_point() {
-                editor.borrow_mut().motion(x + dx, y + dy, false);
+        middle.connect_drag_update(move |g, dx, dy| {
+            let Some((x, y)) = g.start_point() else {
+                return;
+            };
+            let changed = editor
+                .borrow_mut()
+                .ring
+                .as_mut()
+                .is_some_and(|r| r.set_hover(x + dx, y + dy));
+            if changed {
                 refresh();
             }
         });
     }
     {
-        let editor = editor.clone();
-        pan.connect_drag_end(move |g, dx, dy| {
-            if let Some((x, y)) = g.start_point() {
-                editor.borrow_mut().release(x + dx, y + dy, false);
+        let (editor, refresh, ctx) = (editor.clone(), refresh.clone(), ctx.clone());
+        middle.connect_drag_end(move |g, dx, dy| {
+            let Some((x, y)) = g.start_point() else {
+                return;
+            };
+            let mut e = editor.borrow_mut();
+            let Some(ring) = e.ring.as_mut() else { return };
+            let over = ring.node_at(x + dx, y + dy).and_then(|i| ring.pick(i));
+            if let Some(pick) = over {
+                e.ring = None;
+                drop(e);
+                apply_pick(&ctx, &refresh, pick);
+            } else if dx.hypot(dy) < ring::STICKY_SLOP {
+                ring.sticky = true;
+            } else {
+                e.ring = None;
             }
+            refresh();
         });
     }
-    canvas.add_controller(pan);
+    canvas.add_controller(middle);
 
     // Right click runs --actions-on-right-click.
     let right = gtk::GestureClick::new();
@@ -329,8 +410,18 @@ fn connect_pointer(
 
     let motion = gtk::EventControllerMotion::new();
     {
-        let pointer = pointer.clone();
-        motion.connect_motion(move |_, x, y| pointer.set((x, y)));
+        let (pointer, editor, refresh) = (pointer.clone(), editor.clone(), refresh.clone());
+        motion.connect_motion(move |_, x, y| {
+            pointer.set((x, y));
+            let changed = editor
+                .borrow_mut()
+                .ring
+                .as_mut()
+                .is_some_and(|r| r.sticky && r.set_hover(x, y));
+            if changed {
+                refresh();
+            }
+        });
     }
     canvas.add_controller(motion);
 
@@ -473,7 +564,9 @@ fn on_key(
             actions::run(ctx, &list);
         }
         gdk::Key::Escape => {
-            if editor.borrow().selected.is_some() {
+            if editor.borrow().ring.is_some() {
+                editor.borrow_mut().ring = None;
+            } else if editor.borrow().selected.is_some() {
                 editor.borrow_mut().selected = None;
             } else {
                 let list = editor.borrow().settings.actions_on_escape.clone();
@@ -483,7 +576,7 @@ fn on_key(
         gdk::Key::Delete | gdk::Key::BackSpace => {
             editor.borrow_mut().delete_selected();
         }
-        gdk::Key::Tab => bar.widget.set_visible(!bar.widget.is_visible()),
+        gdk::Key::Tab => bar.set_visible(!bar.is_visible()),
         gdk::Key::space => space_held.set(true),
         gdk::Key::bracketleft => {
             let s = editor.borrow().size - 1.0;

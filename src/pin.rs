@@ -1,6 +1,8 @@
-//! Screen pins: each image on an overlay layer at 1:1 physical pixels, no
-//! border, above every window and on every workspace. Drag to move, scroll
-//! to change opacity, double-click or Esc to close, right-click for a menu.
+//! Screen pins: each image in its own borderless window at 1:1 physical
+//! pixels. They are normal windows, so the compositor moves them (smooth,
+//! like any window) and your usual close keybind works. A Hyprland window
+//! rule makes them float (see the README). Drag to move, scroll to change
+//! opacity, double-click or Esc to close, right-click for a menu.
 //!
 //! One process holds every pin. A second `tack pin` hands its files to the
 //! running one (GApplication does this over D-Bus) and exits, and the
@@ -8,7 +10,6 @@
 
 use crate::{clipboard, config, image_io, notify, runtime};
 use gtk::{gdk, gio, glib, prelude::*};
-use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::rc::Rc;
@@ -18,6 +19,10 @@ const OPACITY_MIN: f64 = 0.15;
 const OPACITY_STEP: f64 = 0.05;
 /// Several pins opened at once are spread out by this much.
 const CASCADE: i32 = 32;
+/// How long after mapping to move a pin placed with --at.
+const PLACE_DELAY_MS: u64 = 120;
+/// A press that moves this far (pixels) becomes a window move.
+const DRAG_START: f64 = 4.0;
 
 pub fn run(files: Vec<PathBuf>, at: Option<(i32, i32)>) -> ExitCode {
     // Pins are still images: GTK's cairo renderer draws them fine and saves
@@ -95,6 +100,19 @@ fn open_from_args(app: &gtk::Application, argv: &[String]) {
     }
 }
 
+/// Moves the pin titled `title` so its top-left corner is at x, y. The
+/// title is ours (letters, digits, dashes), so it is safe in the Lua string.
+fn place_window(title: &str, x: i32, y: i32) {
+    let lua =
+        format!(r#"hl.dsp.window.move({{ x = {x}, y = {y}, window = "title:^({title})$" }})"#);
+    let _ = Command::new("hyprctl")
+        .args(["dispatch", &lua])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
+
 fn first_monitor() -> Option<gdk::Monitor> {
     gdk::Display::default()?
         .monitors()
@@ -121,37 +139,24 @@ fn open_pin(
     let w = (texture.width() as f64 / scale).round().max(1.0) as i32;
     let h = (texture.height() as f64 / scale).round().max(1.0) as i32;
 
+    // A unique title lets Hyprland find this pin to place it.
+    let title = format!(
+        "Tack pin {}-{index}-{}",
+        std::process::id(),
+        glib::monotonic_time()
+    );
     let window = gtk::Window::builder()
         .application(app)
+        .title(title.as_str())
         .decorated(false)
         .resizable(false)
         .build();
     window.add_css_class("tack-pin");
-    window.init_layer_shell();
-    window.set_layer(Layer::Overlay);
-    window.set_namespace(Some("tack-pin"));
-    window.set_keyboard_mode(KeyboardMode::OnDemand);
-    window.set_exclusive_zone(-1);
-    window.set_anchor(Edge::Left, true);
-    window.set_anchor(Edge::Top, true);
-    if let Some(m) = &monitor {
-        window.set_monitor(Some(m));
-    }
 
+    // Wayland windows can't place themselves; Hyprland moves the pin once
+    // it is on screen when a position was asked for.
     let shift = index as i32 * CASCADE;
-    let (x, y) = match (at, &monitor) {
-        (Some((x, y)), _) => (
-            (x as f64 / scale) as i32 + shift,
-            (y as f64 / scale) as i32 + shift,
-        ),
-        (None, Some(m)) => {
-            let g = m.geometry();
-            ((g.width() - w) / 2 + shift, (g.height() - h) / 2 + shift)
-        }
-        (None, None) => (100 + shift, 100 + shift),
-    };
-    window.set_margin(Edge::Left, x.max(0));
-    window.set_margin(Edge::Top, y.max(0));
+    let place = at.map(|(x, y)| (x + shift, y + shift));
 
     let picture = gtk::Picture::for_paintable(&texture);
     picture.set_can_shrink(true);
@@ -168,26 +173,43 @@ fn open_pin(
             let _ = std::fs::remove_file(&path);
         }
     });
+    if let Some((x, y)) = place {
+        // Hyprland learns about the window a moment after GTK maps it.
+        window.connect_map(move |_| {
+            let title = title.clone();
+            glib::timeout_add_local_once(
+                std::time::Duration::from_millis(PLACE_DELAY_MS),
+                move || place_window(&title, x, y),
+            );
+        });
+    }
     window.present();
     Ok(())
 }
 
 fn connect_input(window: &gtk::Window, picture: &gtk::Picture, path: &Path) {
-    // Drag to move. The new position is the old margin plus how far the
-    // pointer moved inside the pin, which stays right as the pin follows.
+    // Drag to move: past a few pixels, hand the move to the compositor,
+    // which drags the window as smoothly as any other.
     let drag = gtk::GestureDrag::new();
     drag.set_button(gdk::BUTTON_PRIMARY);
     {
         let window = window.clone();
-        drag.connect_drag_update(move |_, dx, dy| {
-            let (dx, dy) = (dx.round() as i32, dy.round() as i32);
-            if dx == 0 && dy == 0 {
+        drag.connect_drag_update(move |g, dx, dy| {
+            if dx.hypot(dy) < DRAG_START {
                 return;
             }
-            let left = window.margin(Edge::Left) + dx;
-            let top = window.margin(Edge::Top) + dy;
-            window.set_margin(Edge::Left, left);
-            window.set_margin(Edge::Top, top);
+            let (Some((x, y)), Some(device)) = (g.start_point(), g.current_event_device()) else {
+                return;
+            };
+            let toplevel = window
+                .surface()
+                .and_then(|s| s.downcast::<gdk::Toplevel>().ok());
+            if let Some(toplevel) = toplevel {
+                let time = g.current_event_time();
+                g.set_state(gtk::EventSequenceState::Claimed);
+                g.reset();
+                toplevel.begin_move(&device, gdk::BUTTON_PRIMARY as i32, x, y, time);
+            }
         });
     }
     window.add_controller(drag);

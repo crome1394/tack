@@ -3,6 +3,7 @@
 //! document. No widgets here, so it can be tested on its own.
 
 use super::doc::{Doc, Item, Pt, Rect, Rgba, Shape, Tool};
+use super::ring::Ring;
 use super::{effects, shapes};
 use crate::config::Settings;
 use gtk::cairo::{Context, Format, ImageSurface};
@@ -73,6 +74,8 @@ pub struct Editor {
     pub selected: Option<usize>,
     pub text: Option<TextEdit>,
     pub crop_preview: Option<Rect>,
+    /// The middle-click color ring, while it is open.
+    pub ring: Option<Ring>,
     drag: Drag,
     press_screen: (f64, f64),
     /// For text sizes and hit tests outside a draw call.
@@ -109,6 +112,7 @@ impl Editor {
             selected: None,
             text: None,
             crop_preview: None,
+            ring: None,
             drag: Drag::None,
             press_screen: (0.0, 0.0),
             measure: Context::new(&measure_surface).expect("cairo context"),
@@ -624,6 +628,9 @@ impl Editor {
             cr.stroke().ok();
             cr.restore().ok();
         }
+        if let Some(ring) = &self.ring {
+            ring.draw(cr, self.color);
+        }
     }
 
     /// The finished image: 1:1, cropped, with text in progress committed.
@@ -771,6 +778,31 @@ mod tests {
         assert!(e.doc.items.is_empty());
         assert!(e.undo());
         assert_eq!(e.doc.items.len(), 1);
+    }
+
+    #[test]
+    fn the_color_ring_draws_the_palette() {
+        let mut e = editor();
+        let palette = e.settings.palette.clone();
+        let ring = Ring::new(200.0, 150.0, &palette, 400.0, 300.0);
+        let (nx, ny) = ring.node_pos(0);
+        e.ring = Some(ring);
+        let mut surface = ImageSurface::create(Format::ARgb32, 400, 300).unwrap();
+        {
+            let cr = Context::new(&surface).unwrap();
+            e.draw_canvas(&cr, 400.0, 300.0);
+        }
+        // TACK_RING_PNG=/tmp/ring.png cargo test saves the picture to look at.
+        if let Some(path) = std::env::var_os("TACK_RING_PNG") {
+            let mut f = std::fs::File::create(path).unwrap();
+            surface.write_to_png(&mut f).unwrap();
+        }
+        let stride = surface.stride() as usize;
+        let d = surface.data().unwrap();
+        let at = ny as usize * stride + nx as usize * 4;
+        let want = Rgba::parse(&palette[0]).unwrap();
+        assert!((d[at + 2] as f64 / 255.0 - want.r).abs() < 0.02);
+        assert!((d[at + 1] as f64 / 255.0 - want.g).abs() < 0.02);
     }
 
     #[test]

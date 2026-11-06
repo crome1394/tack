@@ -1,5 +1,6 @@
-//! The two toolbar rows: tools and actions on top; colors, size, fill, and
-//! zoom below. `sync` keeps the buttons in step when a key changes things.
+//! The two toolbar rows: tools and actions above the image; colors, size,
+//! fill, and zoom below it. `sync` keeps the buttons in step when a key
+//! changes things.
 
 use super::doc::{Rgba, Tool};
 use super::state::{Editor, SIZE_MAX, SIZE_MIN};
@@ -23,7 +24,10 @@ pub enum Request {
 }
 
 pub struct Toolbar {
-    pub widget: gtk::Box,
+    /// Tools and actions, above the image.
+    pub top: gtk::Box,
+    /// Colors, size, fill, and zoom, below the image.
+    pub bottom: gtk::Box,
     tools: Vec<(Tool, gtk::ToggleButton)>,
     size: gtk::SpinButton,
     fill: gtk::ToggleButton,
@@ -191,13 +195,16 @@ impl Toolbar {
             Request::ActualSize
         }));
 
-        let widget = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        widget.append(&top);
-        widget.append(&bottom);
-        widget.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        let top_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        top_box.append(&top);
+        top_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        let bottom_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        bottom_box.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        bottom_box.append(&bottom);
 
         let bar = Toolbar {
-            widget,
+            top: top_box,
+            bottom: bottom_box,
             tools,
             size,
             fill,
@@ -208,6 +215,15 @@ impl Toolbar {
         };
         bar.sync(editor);
         bar
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        self.top.set_visible(visible);
+        self.bottom.set_visible(visible);
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.top.is_visible()
     }
 
     /// Shows the editor's current state. Setting a control to the value it
