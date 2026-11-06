@@ -24,6 +24,9 @@ pub struct View {
     pub oy: f64,
     /// Refit when the window resizes, until the user zooms or pans.
     pub fit: bool,
+    /// Keep the image centered at 1:1 when the window resizes, until the
+    /// user zooms or pans. This is how the editor opens.
+    pub centered: bool,
 }
 
 impl View {
@@ -106,7 +109,8 @@ impl Editor {
                 zoom: 1.0,
                 ox: 0.0,
                 oy: 0.0,
-                fit: true,
+                fit: false,
+                centered: true,
             },
             active: None,
             selected: None,
@@ -180,6 +184,7 @@ impl Editor {
         self.view.ox = ((width - self.doc.width * zoom) / 2.0).round();
         self.view.oy = ((height - self.doc.height * zoom) / 2.0).round();
         self.view.fit = true;
+        self.view.centered = false;
     }
 
     /// Zooms by `factor`, keeping the image point under (sx, sy) in place.
@@ -190,6 +195,7 @@ impl Editor {
         self.view.ox = sx - p.x * zoom;
         self.view.oy = sy - p.y * zoom;
         self.view.fit = false;
+        self.view.centered = false;
     }
 
     pub fn actual_size(&mut self, width: f64, height: f64) {
@@ -197,6 +203,7 @@ impl Editor {
         self.view.ox = ((width - self.doc.width) / 2.0).round();
         self.view.oy = ((height - self.doc.height) / 2.0).round();
         self.view.fit = false;
+        self.view.centered = true;
     }
 
     // ── Pointer ─────────────────────────────────────────────────────────
@@ -362,6 +369,7 @@ impl Editor {
                 self.view.ox = *ox + (sx - *x0);
                 self.view.oy = *oy + (sy - *y0);
                 self.view.fit = false;
+                self.view.centered = false;
                 true
             }
             Drag::Moving { index, last, moved } => {

@@ -57,21 +57,25 @@ pub fn run(cli: &Cli) -> ExitCode {
     }
 }
 
+/// Narrowest window that shows the whole bar.
+const BAR_MIN_WIDTH: i32 = 1080;
+
 fn window_size(editor: &Editor) -> (i32, i32) {
     if let Some(size) = editor.settings.resize {
         return size;
     }
-    let (iw, ih) = (editor.doc.width as i32, editor.doc.height as i32 + 90);
+    // Room for the image at 1:1, plus the bar under it.
+    let (iw, ih) = (editor.doc.width as i32 + 24, editor.doc.height as i32 + 72);
     let monitor = gdk::Display::default()
         .and_then(|d| d.monitors().item(0))
         .and_then(|m| m.downcast::<gdk::Monitor>().ok())
         .map(|m| m.geometry());
     match monitor {
         Some(g) => (
-            iw.clamp(640, (g.width() as f64 * 0.9) as i32),
+            iw.clamp(BAR_MIN_WIDTH, (g.width() as f64 * 0.9) as i32),
             ih.clamp(400, (g.height() as f64 * 0.9) as i32),
         ),
-        None => (iw.clamp(640, 1600), ih.clamp(400, 1000)),
+        None => (iw.clamp(BAR_MIN_WIDTH, 1600), ih.clamp(400, 1000)),
     }
 }
 
@@ -139,12 +143,6 @@ fn build(app: &gtk::Application, editor: Editor) {
             let (cw, ch) = (canvas.width() as f64, canvas.height() as f64);
             match req {
                 Request::Tool(t) => editor.borrow_mut().set_tool(t),
-                Request::Color(c) => {
-                    let mut e = editor.borrow_mut();
-                    if !same_color(e.color, c) {
-                        e.set_color(c);
-                    }
-                }
                 Request::Size(s) => editor.borrow_mut().set_size(s),
                 Request::Fill(f) => editor.borrow_mut().fill = f,
                 Request::Undo => {
@@ -169,7 +167,7 @@ fn build(app: &gtk::Application, editor: Editor) {
     syncing.set(true);
     let bar = Rc::new(Toolbar::new(&editor.borrow(), send.clone()));
     syncing.set(false);
-    bar.set_visible(!hide_bars);
+    bar.widget.set_visible(!hide_bars);
     *bar_slot.borrow_mut() = Some(bar.clone());
 
     {
@@ -181,9 +179,12 @@ fn build(app: &gtk::Application, editor: Editor) {
     {
         let (editor, refresh) = (editor.clone(), refresh.clone());
         canvas.connect_resize(move |_, w, h| {
-            let fit = editor.borrow().view.fit;
-            if fit {
+            let view = editor.borrow().view;
+            if view.fit {
                 editor.borrow_mut().fit_to(w as f64, h as f64);
+                refresh();
+            } else if view.centered {
+                editor.borrow_mut().actual_size(w as f64, h as f64);
                 refresh();
             }
         });
@@ -195,9 +196,8 @@ fn build(app: &gtk::Application, editor: Editor) {
     connect_keys(&window, &canvas, &editor, &ctx, &refresh, &bar, &space_held);
 
     let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    layout.append(&bar.top);
     layout.append(&canvas);
-    layout.append(&bar.bottom);
+    layout.append(&bar.widget);
     window.set_child(Some(&layout));
     if fullscreen {
         window.fullscreen();
@@ -429,7 +429,7 @@ fn connect_pointer(
     }
     canvas.add_controller(motion);
 
-    // Scroll: size. Ctrl+scroll: zoom around the pointer.
+    // Scroll: zoom around the pointer. Ctrl+scroll: size.
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
     {
         let (editor, refresh, pointer) = (editor.clone(), refresh.clone(), pointer.clone());
@@ -441,12 +441,12 @@ fn connect_pointer(
             if c.current_event_state()
                 .contains(gdk::ModifierType::CONTROL_MASK)
             {
+                let size = e.size - dy.signum();
+                e.set_size(size);
+            } else {
                 let (x, y) = pointer.get();
                 let step = e.settings.zoom_factor;
                 e.zoom_at(x, y, if dy < 0.0 { step } else { 1.0 / step });
-            } else {
-                let size = e.size - dy.signum();
-                e.set_size(size);
             }
             drop(e);
             refresh();
@@ -580,7 +580,7 @@ fn on_key(
         gdk::Key::Delete | gdk::Key::BackSpace => {
             editor.borrow_mut().delete_selected();
         }
-        gdk::Key::Tab => bar.set_visible(!bar.is_visible()),
+        gdk::Key::Tab => bar.widget.set_visible(!bar.widget.is_visible()),
         gdk::Key::space => space_held.set(true),
         gdk::Key::bracketleft => {
             let s = editor.borrow().size - 1.0;
