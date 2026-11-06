@@ -11,6 +11,11 @@ It brings flameshot's best ideas, quick markup and **pinned images that float
 over your work**, to Hyprland and other wlroots compositors. It speaks
 satty's command line, so it drops into the capture script you already have.
 
+<p align="center">
+  <img src="docs/screenshots/editor.png" width="49%" alt="The Tack editor with its tool bar under the image">
+  <img src="docs/screenshots/color-ring.png" width="49%" alt="The middle-click color ring">
+</p>
+
 ## Why Tack
 
 - **Pins that stay out of your way.** Pin a screenshot and it becomes just the
