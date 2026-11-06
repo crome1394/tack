@@ -5,6 +5,9 @@ edition = "2024"
 description = "Screenshot editor and screen pins for Wayland"
 license = "MIT"
 repository = "https://github.com/crome1394/tack"
+readme = "README.md"
+keywords = ["screenshot", "annotation", "wayland", "gtk4", "hyprland"]
+categories = ["multimedia::images"]
 rust-version = "1.85"
 
 [dependencies]

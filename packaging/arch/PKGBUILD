@@ -1,0 +1,37 @@
+# Maintainer: crome1394 <6626555+crome1394@users.noreply.github.com>
+pkgname=tack
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Screenshot editor with flameshot-style screen pins for Wayland (satty-compatible)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/crome1394/tack"
+license=('MIT')
+depends=('gtk4' 'gdk-pixbuf2' 'pango' 'cairo' 'ttf-nerd-fonts-symbols')
+makedepends=('cargo' 'git')
+optdepends=('wl-clipboard: keep copies after tack exits'
+            'libnotify: save and copy notifications'
+            'webp-pixbuf-loader: open WebP images'
+            'hyprland: window rules and pin placement')
+source=("git+$url.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname"
+  cargo build --release --frozen
+}
+
+check() {
+  cd "$pkgname"
+  cargo test --frozen
+}
+
+package() {
+  cd "$pkgname"
+  make install DESTDIR="$pkgdir" PREFIX=/usr
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

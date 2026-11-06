@@ -25,6 +25,9 @@ Goals, in priority order:
   when the last one closes. A second `tack pin` hands its files to the
   running one.
 - `src/image_io.rs`: loading and saving images.
+- `data/`: the desktop entry (`.desktop.in`, `@BINDIR@` is filled in by
+  `make install`) and the app icon. `packaging/arch/`: the PKGBUILD.
+- `install.sh`: checks dependencies, builds, and runs `make install`.
 
 ## Rules
 - `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass.
