@@ -150,21 +150,22 @@ impl Tool {
         Tool::Blur,
     ];
 
-    /// Toolbar glyph, name, and keyboard shortcut.
+    /// Toolbar icon (Material Design Icons in Symbols Nerd Font), name,
+    /// and keyboard shortcut.
     pub fn info(self) -> (&'static str, &'static str, char) {
         match self {
-            Tool::Select => ("⬉", "Select and move", 'v'),
-            Tool::Crop => ("⛶", "Crop", 'c'),
-            Tool::Pen => ("✎", "Pen", 'p'),
-            Tool::Marker => ("▌", "Marker", 'm'),
-            Tool::Line => ("╱", "Line", 'l'),
-            Tool::Arrow => ("↗", "Arrow", 'a'),
-            Tool::Rect => ("▭", "Rectangle", 'r'),
-            Tool::Ellipse => ("◯", "Ellipse", 'e'),
-            Tool::Text => ("T", "Text", 't'),
-            Tool::Counter => ("①", "Counter", 'n'),
-            Tool::Pixelate => ("▦", "Pixelate", 'x'),
-            Tool::Blur => ("◌", "Blur", 'b'),
+            Tool::Select => ("\u{f0e47}", "Select and move", 'v'),
+            Tool::Crop => ("\u{f019e}", "Crop", 'c'),
+            Tool::Pen => ("\u{f03ea}", "Pen", 'p'),
+            Tool::Marker => ("\u{f0652}", "Marker", 'm'),
+            Tool::Line => ("\u{f055e}", "Line", 'l'),
+            Tool::Arrow => ("\u{f005c}", "Arrow", 'a'),
+            Tool::Rect => ("\u{f0e5f}", "Rectangle", 'r'),
+            Tool::Ellipse => ("\u{f0ea1}", "Ellipse", 'e'),
+            Tool::Text => ("\u{f0284}", "Text", 't'),
+            Tool::Counter => ("\u{f0ca0}", "Counter", 'n'),
+            Tool::Pixelate => ("\u{f013a}", "Pixelate", 'x'),
+            Tool::Blur => ("\u{f00b5}", "Blur", 'b'),
         }
     }
 

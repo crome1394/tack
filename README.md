@@ -12,7 +12,8 @@ command-line flags so it can replace satty in a capture script.
 
 ## Install
 
-Needs GTK 4.14+ (`pacman -S gtk4`).
+Needs GTK 4.14+ (`pacman -S gtk4`) and Symbols Nerd Font for the toolbar
+icons (Google's Material Design Icons; `pacman -S ttf-nerd-fonts-symbols`).
 `wl-copy` (wl-clipboard) is used for copying when installed, and
 `notify-send` for notifications.
 
@@ -52,6 +53,10 @@ is Pen, and `highlight` is Marker. Tack's `marker` is the highlighter
 
 ## Editor
 
+The editor opens at 1:1. One bar under the image holds the tools, the
+current color (pick colors from the middle-click ring), size, fill, undo and
+redo, zoom, and Copy, Save, Save as, and Pin.
+
 | Tool | Key | |
 |------|-----|---|
 | Select | V | Click an annotation to select it, drag to move, Delete to remove. A color click recolors it. |
@@ -69,19 +74,19 @@ is Pen, and `highlight` is Marker. Tack's `marker` is the highlighter
 
 | Key | Does |
 |-----|------|
-| Scroll | Change the size (line width, text size, effect strength) |
+| Scroll | Zoom around the pointer |
+| Ctrl+scroll, [ and ] | Smaller / larger (line width, text size, effect strength) |
 | Middle-click | Color ring: your palette around the pointer, plus 🎨 for any color. Release over a color, or release in place and click one. Esc closes it. |
-| Ctrl+scroll, Ctrl+plus/minus | Zoom around the pointer |
+| Ctrl+plus/minus | Zoom around the middle |
 | Space+drag | Pan |
 | Ctrl+0 / Ctrl+1 | Fit to the window / actual size |
-| [ and ] | Smaller / larger |
 | Ctrl+Z, Ctrl+Shift+Z (Ctrl+Y) | Undo, redo |
 | Ctrl+C | Copy |
 | Ctrl+S, Ctrl+Shift+S | Save, save as |
 | Ctrl+P | Pin |
 | Enter | `--actions-on-enter` (default: copy) |
 | Esc | Deselect, else `--actions-on-escape` (default: exit) |
-| Tab | Show or hide the toolbars |
+| Tab | Show or hide the bar |
 
 Save writes to `--output-filename` (strftime codes like `%Y-%m-%d` and `~`
 work; `-` prints the PNG to stdout). Without one, Save asks where. The file
