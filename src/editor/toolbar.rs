@@ -53,6 +53,10 @@ fn install_css() {
 .tack-bar button {{ min-height: 28px; padding: 2px 6px; }}
 .tack-icon {{ font-family: \"{ICON_FONT}\"; font-size: 18px; min-width: 30px; }}
 .tack-zoom {{ min-width: 46px; opacity: 0.75; }}
+.tack-header {{ min-height: 24px; padding: 0 4px 0 10px; border-bottom: 1px solid alpha(currentColor, 0.12); }}
+.tack-title {{ font-size: 12px; font-weight: bold; opacity: 0.8; }}
+.tack-close {{ font-family: \"{ICON_FONT}\"; font-size: 13px; min-height: 20px; min-width: 20px; padding: 0 4px; margin: 2px 0; }}
+.tack-close:hover {{ background: alpha(#e5484d, 0.85); color: white; }}
 "
     );
     let provider = gtk::CssProvider::new();

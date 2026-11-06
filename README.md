@@ -53,7 +53,8 @@ is Pen, and `highlight` is Marker. Tack's `marker` is the highlighter
 
 ## Editor
 
-The editor opens at 1:1. One bar under the image holds the tools, the
+The editor opens at 1:1. A slim header shows the name and a close button
+(drag it to move the window). One bar under the image holds the tools, the
 current color (pick colors from the middle-click ring), size, fill, undo and
 redo, zoom, and Copy, Save, Save as, and Pin.
 
