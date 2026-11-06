@@ -17,10 +17,13 @@ Goals, in priority order:
 - `src/config.rs`: `~/.config/tack/config.toml`, merged under the flags.
 - `src/editor/`: the editor. `doc.rs` holds the image, annotations, and undo
   history; `shapes.rs` draws annotations; `effects.rs` pixelates and blurs;
-  `canvas.rs` handles input and the view; `toolbar.rs` builds the controls;
+  `state.rs` applies tools, input, and the view; `toolbar.rs` builds the controls;
   `actions.rs` copies, saves, and pins; `mod.rs` builds the window.
-- `src/pin.rs`: the pin service. One process holds every pin and exits when
-  the last one closes. A second `tack pin` hands its files to the running one.
+- `src/editor/ring.rs`: the middle-click color ring.
+- `src/pin.rs`: the pin service. Pins are normal borderless windows (a
+  Hyprland window rule floats them). One process holds every pin and exits
+  when the last one closes. A second `tack pin` hands its files to the
+  running one.
 - `src/image_io.rs`: loading and saving images.
 
 ## Rules

@@ -6,13 +6,13 @@ command-line flags so it can replace satty in a capture script.
 
 - **Edit**: arrows, lines, rectangles, ellipses, pen, marker, text, numbered
   counters, pixelate, blur, and crop. Undo, redo, zoom, and pan.
-- **Pin**: put an image on the screen as just the image: 1:1, no border,
-  above every window, on every workspace. Drag it anywhere. Pins stay after
-  the editor closes.
+- **Pin**: put an image on the screen as just the image: 1:1, no border.
+  Pins are normal windows, so they move as smoothly as any window and your
+  close keybind works on them. Pins stay after the editor closes.
 
 ## Install
 
-Needs GTK 4.14+ and gtk4-layer-shell (`pacman -S gtk4 gtk4-layer-shell`).
+Needs GTK 4.14+ (`pacman -S gtk4`).
 `wl-copy` (wl-clipboard) is used for copying when installed, and
 `notify-send` for notifications.
 
@@ -70,8 +70,9 @@ is Pen, and `highlight` is Marker. Tack's `marker` is the highlighter
 | Key | Does |
 |-----|------|
 | Scroll | Change the size (line width, text size, effect strength) |
+| Middle-click | Color ring: your palette around the pointer, plus 🎨 for any color. Release over a color, or release in place and click one. Esc closes it. |
 | Ctrl+scroll, Ctrl+plus/minus | Zoom around the pointer |
-| Middle drag, Space+drag | Pan |
+| Space+drag | Pan |
 | Ctrl+0 / Ctrl+1 | Fit to the window / actual size |
 | [ and ] | Smaller / larger |
 | Ctrl+Z, Ctrl+Shift+Z (Ctrl+Y) | Undo, redo |
@@ -95,9 +96,11 @@ type follows the extension: png, jpg, webp, bmp, or tiff.
 | Double-click, Esc | Close |
 | Right-click | Copy, Save to Pictures, Edit, Close, Close all pins |
 
-Pins sit on the overlay layer (layer-shell namespace `tack-pin`), so they
-stay above windows and across workspaces and don't appear in window lists.
-One small process holds every pin and exits when the last one closes.
+Each pin is a borderless window with the app id
+`io.github.crome1394.Tack.Pins`, so Hyprland moves it and your usual close
+keybind closes it. `--at X,Y` places a pin through `hyprctl` once it is on
+screen. One small process holds every pin and exits when the last one
+closes.
 
 ## Config
 
@@ -125,10 +128,31 @@ palette = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#a855f7", "#f
 
 ## Hyprland
 
-The editor's app id is `io.github.crome1394.Tack`. To float it:
+The editor's app id is `io.github.crome1394.Tack`; pins use
+`io.github.crome1394.Tack.Pins`. These rules float the editor, and make
+pins float on every workspace with no border, shadow, or animation:
 
 ```lua
-hl.window_rule({ name = "Tack", match = { class = "^(io.github.crome1394.Tack)$" }, float = true, center = true })
+hl.window_rule({
+    name   = "Tack",
+    match  = { class = "^(io\\.github\\.crome1394\\.Tack)$" },
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name        = "Tack pins",
+    match       = { class = "^(io\\.github\\.crome1394\\.Tack\\.Pins)$" },
+    float       = true,
+    pin         = true,   -- on every workspace; drop it to keep pins on one
+    center      = true,
+    border_size = 0,
+    rounding    = 0,
+    no_shadow   = true,
+    no_blur     = true,
+    no_anim     = true,
+    decorate    = false,
+})
 ```
 
 ## License
