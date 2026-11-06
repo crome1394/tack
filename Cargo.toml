@@ -1,0 +1,23 @@
+[package]
+name = "tack"
+version = "0.1.0"
+edition = "2024"
+description = "Screenshot editor and screen pins for Wayland"
+license = "MIT"
+repository = "https://github.com/crome1394/tack"
+rust-version = "1.85"
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+gtk4-layer-shell = "0.8"
+pangocairo = "0.22"
+cairo-rs = { version = "0.22", features = ["png"] }
+clap = { version = "4.6", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
