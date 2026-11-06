@@ -57,6 +57,32 @@ pub fn run(cli: &Cli) -> ExitCode {
     }
 }
 
+/// A slim header: the app name on the left, a small close button on the
+/// right. Dragging it moves the window.
+fn header(window: &gtk::ApplicationWindow) -> gtk::WindowHandle {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    row.add_css_class("tack-header");
+    let title = gtk::Label::new(Some(window.title().as_deref().unwrap_or("Tack")));
+    title.add_css_class("tack-title");
+    title.set_hexpand(true);
+    title.set_xalign(0.0);
+    row.append(&title);
+    let close = gtk::Button::with_label("\u{f0156}");
+    close.add_css_class("flat");
+    close.add_css_class("tack-close");
+    close.set_tooltip_text(Some("Close"));
+    close.set_focus_on_click(false);
+    close.set_valign(gtk::Align::Center);
+    {
+        let window = window.clone();
+        close.connect_clicked(move |_| window.close());
+    }
+    row.append(&close);
+    let handle = gtk::WindowHandle::new();
+    handle.set_child(Some(&row));
+    handle
+}
+
 /// Narrowest window that shows the whole bar.
 const BAR_MIN_WIDTH: i32 = 1080;
 
@@ -64,8 +90,8 @@ fn window_size(editor: &Editor) -> (i32, i32) {
     if let Some(size) = editor.settings.resize {
         return size;
     }
-    // Room for the image at 1:1, plus the bar under it.
-    let (iw, ih) = (editor.doc.width as i32 + 24, editor.doc.height as i32 + 72);
+    // Room for the image at 1:1, plus the header and the bar.
+    let (iw, ih) = (editor.doc.width as i32 + 24, editor.doc.height as i32 + 98);
     let monitor = gdk::Display::default()
         .and_then(|d| d.monitors().item(0))
         .and_then(|m| m.downcast::<gdk::Monitor>().ok())
@@ -196,6 +222,7 @@ fn build(app: &gtk::Application, editor: Editor) {
     connect_keys(&window, &canvas, &editor, &ctx, &refresh, &bar, &space_held);
 
     let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    layout.append(&header(&window));
     layout.append(&canvas);
     layout.append(&bar.widget);
     window.set_child(Some(&layout));
