@@ -377,17 +377,21 @@ fn connect_pointer(
             let Some((x, y)) = g.start_point() else {
                 return;
             };
-            let mut e = editor.borrow_mut();
-            let Some(ring) = e.ring.as_mut() else { return };
-            let over = ring.node_at(x + dx, y + dy).and_then(|i| ring.pick(i));
-            if let Some(pick) = over {
-                e.ring = None;
-                drop(e);
+            // Decide with the editor borrowed, then let it go before
+            // anything that reads it (apply_pick, refresh).
+            let pick = {
+                let mut e = editor.borrow_mut();
+                let Some(ring) = e.ring.as_mut() else { return };
+                let over = ring.node_at(x + dx, y + dy).and_then(|i| ring.pick(i));
+                if over.is_some() || dx.hypot(dy) >= ring::STICKY_SLOP {
+                    e.ring = None;
+                } else {
+                    ring.sticky = true;
+                }
+                over
+            };
+            if let Some(pick) = pick {
                 apply_pick(&ctx, &refresh, pick);
-            } else if dx.hypot(dy) < ring::STICKY_SLOP {
-                ring.sticky = true;
-            } else {
-                e.ring = None;
             }
             refresh();
         });
