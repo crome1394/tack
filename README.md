@@ -6,152 +6,58 @@
 
 <p align="center"><b>Mark up a screenshot. Pin it to your screen. Get back to work.</b></p>
 
-Tack is a fast screenshot editor for Wayland, written in Rust and GTK4.
-It brings flameshot's best ideas, quick markup and **pinned images that float
-over your work**, to Hyprland and other wlroots compositors. It speaks
-satty's command line, so it drops into the capture script you already have.
-
 <p align="center">
-  <img src="docs/screenshots/editor.png" width="49%" alt="The Tack editor with its tool bar under the image">
-  <img src="docs/screenshots/color-ring.png" width="49%" alt="The middle-click color ring">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version 0.1.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/rust-1.85%2B-orange?logo=rust" alt="Rust 1.85+">
+  <img src="https://img.shields.io/badge/GTK-4.14%2B-4a86cf?logo=gtk" alt="GTK 4.14+">
+  <img src="https://img.shields.io/badge/Wayland-Hyprland%20%7C%20wlroots-ffbc00?logo=wayland" alt="Wayland: Hyprland and wlroots">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey?logo=linux" alt="Linux">
 </p>
 
-## Why Tack
+Tack is a fast screenshot editor for Wayland, written in Rust and GTK4. It
+brings flameshot's quick markup and **pinned images that float over your
+work** to Hyprland and other wlroots compositors, and it speaks satty's
+command line, so it drops into the capture script you already have.
 
-- **Pins that stay out of your way.** Pin a screenshot and it becomes just the
-  image: 1:1, no border, no window chrome. Drag it anywhere, scroll to fade
-  it, close it with your usual keybind. Pins outlive the editor.
-- **Every tool you reach for.** Arrow, line, rectangle, ellipse, pen,
-  highlighter, text, numbered steps, pixelate, blur, and crop, with undo,
-  redo, and zoom.
-- **A color ring at your fingertip.** Middle-click for your palette in a ring
-  around the pointer, plus a full color picker.
-- **Satty-compatible.** Swap `satty` for `tack` and your flags keep working.
-- **Lean.** A 1.4 MB binary that opens instantly. Nothing runs when no editor
-  or pin is open.
+<p align="center">
+  <img src="docs/screenshots/editor.png" width="80%" alt="The Tack editor with its tool bar under the image">
+</p>
 
-## Install
+## Features
 
-### Dependencies
+| | |
+|---|---|
+| **Screen pins** | The image at 1:1, with no border or window chrome. Drag, scroll to fade, close with your usual keybind. Pins stay open after the editor closes. |
+| **Markup tools** | Arrow, line, rectangle, ellipse, pen, highlighter, text, numbered steps, pixelate, blur, and crop. Undo, redo, and zoom. |
+| **Color ring** | Middle-click for your palette in a ring around the pointer, plus a full color picker. |
+| **Settings** | A gear in the header sets the default color, size, and whether images open at 1:1 or fit to the window. |
+| **Satty-compatible** | Swap `satty` for `tack` and keep your flags. |
+| **Lean** | A 1.4 MB binary that opens instantly. Nothing runs when no editor or pin is open. |
 
-| | Arch / CachyOS package | |
-|---|---|---|
-| GTK 4.14+, gdk-pixbuf, Pango, Cairo | `gtk4` | required |
-| Toolbar icons | `ttf-nerd-fonts-symbols` | required |
-| Rust 1.85+ and Cargo | `rust` (or rustup) | to build |
-| Clipboard that outlives the app | `wl-clipboard` | recommended |
-| Notifications | `libnotify` | optional |
-| WebP images | `webp-pixbuf-loader` | optional |
-
-On Debian/Ubuntu, build with `libgtk-4-dev` and `pkg-config`.
-
-### Quick install
+## Quick start
 
 ```sh
-git clone https://github.com/crome1394/tack.git
-cd tack
-./install.sh            # to ~/.local, no root needed
-./install.sh --system   # or system-wide, to /usr
-```
+git clone https://github.com/crome1394/tack.git && cd tack
+./install.sh                           # to ~/.local, no root needed
 
-The script checks the dependencies (and offers to install missing ones on
-Arch and CachyOS), builds, and installs. `./install.sh --uninstall` removes
-it.
-
-### Build by hand
-
-```sh
-make                             # build
-make install                     # to ~/.local
-sudo make install PREFIX=/usr    # or system-wide
-```
-
-This installs the `tack` binary, an app icon, and a desktop entry, so
-**Open With → Tack** shows up for images in any file manager.
-`make uninstall` removes them again.
-
-Arch users can build a package with `packaging/arch/PKGBUILD` (`makepkg -si`).
-
-## Use
-
-```sh
-tack shot.png                          # edit
 grim -g "$(slurp)" - | tack -f -       # capture and edit
 tack pin shot.png                      # pin to the screen
 ```
 
-**Coming from satty?** Change the program name and keep your flags:
+Needs GTK 4.14+ and `ttf-nerd-fonts-symbols`. See [Install](docs/install.md)
+for every dependency and other ways to build.
 
-```sh
-tack --filename "$f" --output-filename "$f" \
-     --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy
-```
+## Documentation
 
-## Keys
-
-| Editor | |
+| Document | What's in it |
 |---|---|
-| V C P M L A R E T N X B | Select, Crop, Pen, Marker, Line, Arrow, Rectangle, Ellipse, Text, Counter, Pixelate, Blur |
-| Middle-click | Color ring |
-| Scroll / Ctrl+scroll | Zoom / size |
-| Shift while drawing | Snap lines to 45°, make squares and circles |
-| F | Fill shapes |
-| Space+drag | Pan |
-| Ctrl+Z, Ctrl+Shift+Z | Undo, redo |
-| Ctrl+C, Ctrl+S, Ctrl+P | Copy, save, pin |
-| Enter / Esc | Copy (configurable) / close |
-
-| Pins | |
-|---|---|
-| Drag | Move |
-| Scroll | Fade |
-| Double-click, Esc, your close keybind | Close |
-| Right-click | Copy, save, edit, close all |
-
-## Configure
-
-Optional settings live in `~/.config/tack/config.toml`; command-line flags win.
-
-```toml
-[general]
-output-filename = "~/Pictures/Screenshots/tack-%Y-%m-%d_%H-%M-%S.png"
-copy-command = "wl-copy"
-actions-on-enter = ["save-to-clipboard"]
-early-exit = ["copy"]
-initial-tool = "arrow"
-font-family = "Inter"
-
-[colors]
-palette = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#a855f7", "#ffffff", "#000000"]
-```
-
-All keys: `output-filename`, `copy-command`, `actions-on-enter`,
-`actions-on-escape`, `actions-on-right-click`, `early-exit`,
-`save-after-copy`, `auto-copy`, `initial-tool`, `annotation-size-factor`,
-`corner-roundness`, `font-family`, `font-style`, `default-fill-shapes`,
-`default-hide-toolbars`, `disable-notifications`, `zoom-factor`,
-`pin-save-dir`. Actions: `save-to-clipboard`, `save-to-file`,
-`save-to-file-as`, `copy-filepath-to-clipboard`, `pin`, `exit`.
-
-### Hyprland
-
-Float the editor, and give pins no border, shadow, or animation, on every
-workspace:
-
-```lua
-hl.window_rule({ name = "Tack", match = { class = "^(io\\.github\\.crome1394\\.Tack)$" },
-    float = true, center = true })
-hl.window_rule({ name = "Tack pins", match = { class = "^(io\\.github\\.crome1394\\.Tack\\.Pins)$" },
-    float = true, pin = true, center = true, border_size = 0, rounding = 0,
-    no_shadow = true, no_blur = true, no_anim = true, decorate = false })
-```
-
-`tack pin --at X,Y` places a pin through `hyprctl`.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Changes are listed in
-[CHANGELOG.md](CHANGELOG.md).
+| [Install](docs/install.md) | Dependencies, `install.sh`, `make install`, Arch PKGBUILD |
+| [Usage](docs/usage.md) | Commands, satty flags, keyboard and mouse shortcuts |
+| [Configuration](docs/configuration.md) | Settings window, `config.toml` keys, Hyprland window rules |
+| [Architecture](ARCHITECTURE.md) | How the code fits together |
+| [Changelog](CHANGELOG.md) | What changed in each release |
+| [Contributing](CONTRIBUTING.md) | Building, checks, and code rules |
 
 ## License
 
