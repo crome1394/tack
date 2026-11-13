@@ -14,6 +14,7 @@ DESTDIR ?=
 CARGO   ?= cargo
 
 BIN     := target/release/tack
+SOURCES := Cargo.toml Cargo.lock $(shell find src -name '*.rs')
 APPS    := $(DESTDIR)$(DATADIR)/applications
 ICONS   := $(DESTDIR)$(DATADIR)/icons/hicolor/scalable/apps
 
@@ -24,7 +25,15 @@ all: build
 build:
 	$(CARGO) build --release --locked
 
-$(BIN):
+# Rebuilt when any source is newer, so `make install` never installs a
+# stale binary. Under sudo it refuses to build: cargo as root would leave
+# root-owned files in target/. (DESTDIR installs, as in the PKGBUILD, run
+# under fakeroot after their own build.)
+$(BIN): $(SOURCES)
+	@if [ "$$(id -u)" = 0 ] && [ -z "$(DESTDIR)" ]; then \
+		echo "tack: the build is out of date. Run 'make' as yourself first." >&2; \
+		exit 1; \
+	fi
 	$(CARGO) build --release --locked
 
 install: $(BIN)

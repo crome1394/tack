@@ -11,6 +11,11 @@ All notable changes to Tack. The format follows
   and whether images open at 1:1 or fit to the window. Saved to
   `config.toml` as `default-color`, `default-size`, and `default-view`.
 
+### Fixed
+- `make install` no longer installs a stale binary: it rebuilds when the
+  sources changed. Under `sudo` it asks you to run `make` first instead
+  of building as root.
+
 ## [0.1.0] - 2026-11-06
 
 First release.
