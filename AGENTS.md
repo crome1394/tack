@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Tack: a screenshot editor and image pinner for Wayland (Hyprland, CachyOS),
+Tack: a screenshot editor and image pinner for Wayland (Hyprland, CachyOS;
+also Ubuntu-based systems from 24.04),
 written in Rust with GTK4. It replaces satty (same command-line flags) and
 brings flameshot's editor tools and screen pins.
 
@@ -30,7 +31,8 @@ Goals, in priority order:
 - `src/image_io.rs`: loading and saving images.
 - `data/`: the desktop entry (`.desktop.in`, `@BINDIR@` is filled in by
   `make install`) and the app icon. `packaging/arch/`: the PKGBUILD.
-- `install.sh`: checks dependencies, builds, and runs `make install`.
+- `install.sh`: checks dependencies (pacman or apt), builds, and runs
+  `make install`. Arch-based and Ubuntu-based systems are both supported.
 
 ## Rules
 - `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` pass.

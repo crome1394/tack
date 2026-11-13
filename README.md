@@ -12,7 +12,8 @@
   <img src="https://img.shields.io/badge/rust-1.85%2B-orange?logo=rust" alt="Rust 1.85+">
   <img src="https://img.shields.io/badge/GTK-4.14%2B-4a86cf?logo=gtk" alt="GTK 4.14+">
   <img src="https://img.shields.io/badge/Wayland-Hyprland%20%7C%20wlroots-ffbc00?logo=wayland" alt="Wayland: Hyprland and wlroots">
-  <img src="https://img.shields.io/badge/platform-Linux-lightgrey?logo=linux" alt="Linux">
+  <img src="https://img.shields.io/badge/Arch-supported-1793d1?logo=archlinux" alt="Arch supported">
+  <img src="https://img.shields.io/badge/Ubuntu-24.04%2B-e95420?logo=ubuntu" alt="Ubuntu 24.04+">
 </p>
 
 Tack is a fast screenshot editor for Wayland, written in Rust and GTK4. It
@@ -45,14 +46,15 @@ grim -g "$(slurp)" - | tack -f -       # capture and edit
 tack pin shot.png                      # pin to the screen
 ```
 
-Needs GTK 4.14+ and `ttf-nerd-fonts-symbols`. See [Install](docs/install.md)
-for every dependency and other ways to build.
+Works on Arch-based systems and Ubuntu-based ones from 24.04 (Pop!_OS,
+Mint, Debian 13). `install.sh` installs what's missing with pacman or apt.
+See [Install](docs/install.md) for dependencies and desktop notes.
 
 ## Documentation
 
 | Document | What's in it |
 |---|---|
-| [Install](docs/install.md) | Dependencies, `install.sh`, `make install`, Arch PKGBUILD |
+| [Install](docs/install.md) | Supported distributions, dependencies, `install.sh`, desktop notes |
 | [Usage](docs/usage.md) | Commands, satty flags, keyboard and mouse shortcuts |
 | [Configuration](docs/configuration.md) | Settings window, `config.toml` keys, Hyprland window rules |
 | [Architecture](ARCHITECTURE.md) | How the code fits together |

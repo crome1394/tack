@@ -10,6 +10,10 @@ All notable changes to Tack. The format follows
 - Settings window (gear icon in the header) for the default color, size,
   and whether images open at 1:1 or fit to the window. Saved to
   `config.toml` as `default-color`, `default-size`, and `default-view`.
+- `install.sh` supports Ubuntu-based systems (Ubuntu, Pop!_OS, Mint,
+  Debian): it installs packages with apt, Rust with rustup, and the icon
+  font from the Nerd Fonts releases, and stops early on releases whose
+  GTK is too old. It also checks the Rust version and the C compiler.
 
 ### Fixed
 - `make install` no longer installs a stale binary: it rebuilds when the
