@@ -3,13 +3,14 @@
 pub mod actions;
 pub mod doc;
 pub mod effects;
+pub mod prefs;
 pub mod ring;
 pub mod shapes;
 pub mod state;
 pub mod toolbar;
 
 use crate::cli::Cli;
-use crate::config::Settings;
+use crate::config::{Settings, StartView};
 use crate::{clipboard, image_io};
 use actions::Ctx;
 use doc::{Doc, Rgba, Tool};
@@ -57,9 +58,9 @@ pub fn run(cli: &Cli) -> ExitCode {
     }
 }
 
-/// A slim header: the app name on the left, a small close button on the
-/// right. Dragging it moves the window.
-fn header(window: &gtk::ApplicationWindow) -> gtk::WindowHandle {
+/// A slim header: the app name on the left, settings and close buttons on
+/// the right. Dragging it moves the window.
+fn header(window: &gtk::ApplicationWindow, on_settings: impl Fn() + 'static) -> gtk::WindowHandle {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     row.add_css_class("tack-header");
     let title = gtk::Label::new(Some(window.title().as_deref().unwrap_or("Tack")));
@@ -67,6 +68,15 @@ fn header(window: &gtk::ApplicationWindow) -> gtk::WindowHandle {
     title.set_hexpand(true);
     title.set_xalign(0.0);
     row.append(&title);
+    let settings = gtk::Button::with_label("\u{f0493}");
+    settings.add_css_class("flat");
+    settings.add_css_class("tack-close");
+    settings.add_css_class("tack-settings");
+    settings.set_tooltip_text(Some("Settings"));
+    settings.set_focus_on_click(false);
+    settings.set_valign(gtk::Align::Center);
+    settings.connect_clicked(move |_| on_settings());
+    row.append(&settings);
     let close = gtk::Button::with_label("\u{f0156}");
     close.add_css_class("flat");
     close.add_css_class("tack-close");
@@ -222,7 +232,30 @@ fn build(app: &gtk::Application, editor: Editor) {
     connect_keys(&window, &canvas, &editor, &ctx, &refresh, &bar, &space_held);
 
     let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    layout.append(&header(&window));
+    let on_settings = {
+        let (window, editor, canvas, refresh) = (
+            window.clone(),
+            editor.clone(),
+            canvas.clone(),
+            refresh.clone(),
+        );
+        move || {
+            // After a save, show the image the new way right away.
+            let apply: Rc<dyn Fn(StartView)> = {
+                let (editor, canvas, refresh) = (editor.clone(), canvas.clone(), refresh.clone());
+                Rc::new(move |view| {
+                    let (cw, ch) = (canvas.width() as f64, canvas.height() as f64);
+                    match view {
+                        StartView::Fit => editor.borrow_mut().fit_to(cw, ch),
+                        StartView::Actual => editor.borrow_mut().actual_size(cw, ch),
+                    }
+                    refresh();
+                })
+            };
+            prefs::open(&window, &editor, apply);
+        }
+    };
+    layout.append(&header(&window, on_settings));
     layout.append(&canvas);
     layout.append(&bar.widget);
     window.set_child(Some(&layout));

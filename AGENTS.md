@@ -20,6 +20,9 @@ Goals, in priority order:
   `state.rs` applies tools, input, and the view; `toolbar.rs` builds the controls;
   `actions.rs` copies, saves, and pins; `mod.rs` builds the window.
 - `src/editor/ring.rs`: the middle-click color ring.
+- `src/editor/prefs.rs`: the settings window (default color, size, view).
+  It writes `[general]` keys with `config::save_defaults`, keeping the
+  rest of the file as it is.
 - `src/pin.rs`: the pin service. Pins are normal borderless windows (a
   Hyprland window rule floats them). One process holds every pin and exits
   when the last one closes. A second `tack pin` hands its files to the

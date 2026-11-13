@@ -4,6 +4,13 @@ All notable changes to Tack. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Settings window (gear icon in the header) for the default color, size,
+  and whether images open at 1:1 or fit to the window. Saved to
+  `config.toml` as `default-color`, `default-size`, and `default-view`.
+
 ## [0.1.0] - 2026-11-06
 
 First release.

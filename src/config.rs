@@ -15,6 +15,9 @@
 //! font-family = "Inter"
 //! default-fill-shapes = false
 //! disable-notifications = false
+//! default-color = "#ef4444"     # else the first palette color
+//! default-size = 4              # 1 to 40
+//! default-view = "actual"       # "actual" (1:1) or "fit"
 //!
 //! [colors]
 //! palette = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#ffffff", "#000000"]
@@ -45,7 +48,34 @@ struct General {
     disable_notifications: Option<bool>,
     zoom_factor: Option<f64>,
     pin_save_dir: Option<String>,
+    default_color: Option<String>,
+    default_size: Option<f64>,
+    default_view: Option<StartView>,
 }
+
+/// How the editor first shows the image.
+#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum StartView {
+    /// 1:1, centered.
+    #[default]
+    Actual,
+    /// Scaled down to fit the window.
+    Fit,
+}
+
+impl StartView {
+    pub fn key(self) -> &'static str {
+        match self {
+            StartView::Actual => "actual",
+            StartView::Fit => "fit",
+        }
+    }
+}
+
+pub const SIZE_MIN: f64 = 1.0;
+pub const SIZE_MAX: f64 = 40.0;
+pub const SIZE_DEFAULT: f64 = 4.0;
 
 #[derive(Deserialize, Default, Debug)]
 #[serde(default)]
@@ -81,6 +111,12 @@ pub struct Settings {
     pub notifications: bool,
     pub zoom_factor: f64,
     pub palette: Vec<String>,
+    /// Starting color: `default-color`, else the first palette color.
+    pub color: String,
+    pub size: f64,
+    pub view: StartView,
+    /// The config file these came from; the settings window writes here.
+    pub config_path: PathBuf,
     pub fullscreen: bool,
     pub resize: Option<(i32, i32)>,
     pub title: String,
@@ -131,7 +167,7 @@ fn parse_size(text: &str) -> Option<(i32, i32)> {
     (w > 0 && h > 0).then_some((w, h))
 }
 
-fn color_ok(text: &str) -> bool {
+pub fn color_ok(text: &str) -> bool {
     let hex = text.strip_prefix('#').unwrap_or("");
     matches!(hex.len(), 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit())
 }
@@ -164,6 +200,15 @@ impl Settings {
             .into_iter()
             .filter(|c| color_ok(c))
             .collect();
+        let palette = if palette.is_empty() {
+            DEFAULT_PALETTE.iter().map(|s| s.to_string()).collect()
+        } else {
+            palette
+        };
+        let color = g
+            .default_color
+            .filter(|c| color_ok(c))
+            .unwrap_or_else(|| palette[0].clone());
 
         Settings {
             output_filename: cli.output_filename.clone().or(g.output_filename),
@@ -207,17 +252,94 @@ impl Settings {
                 .or(g.zoom_factor)
                 .filter(|f| *f > 1.0 && *f < 4.0)
                 .unwrap_or(1.1),
-            palette: if palette.is_empty() {
-                DEFAULT_PALETTE.iter().map(|s| s.to_string()).collect()
-            } else {
-                palette
-            },
+            palette,
+            color,
+            size: g
+                .default_size
+                .filter(|s| s.is_finite())
+                .map(|s| s.clamp(SIZE_MIN, SIZE_MAX).round())
+                .unwrap_or(SIZE_DEFAULT),
+            view: g.default_view.unwrap_or_default(),
+            config_path: path,
             fullscreen: cli.fullscreen.is_some(),
             resize: cli.resize.as_deref().and_then(parse_size),
             title: cli.title.clone().unwrap_or_else(|| "Tack".into()),
             decorated: !cli.no_window_decoration,
         }
     }
+}
+
+/// The defaults the settings window changes.
+pub struct Defaults {
+    pub color: String,
+    pub size: f64,
+    pub view: StartView,
+}
+
+/// Writes the defaults into `[general]` of the config file, keeping every
+/// other line (comments too) as it is. The write is atomic.
+pub fn save_defaults(path: &Path, d: &Defaults) -> Result<(), String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let text = set_general_keys(
+        &text,
+        &[
+            ("default-color", format!("\"{}\"", d.color)),
+            ("default-size", format!("{}", d.size.round() as i64)),
+            ("default-view", format!("\"{}\"", d.view.key())),
+        ],
+    );
+    // Never write a file we can't read back.
+    toml::from_str::<File>(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+    crate::image_io::write_atomic(path, text.as_bytes())
+}
+
+/// Sets `key = value` lines in `[general]`: replaces a key that is there,
+/// adds one that isn't, and adds the table if the file has none.
+fn set_general_keys(text: &str, pairs: &[(&str, String)]) -> String {
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let header = |l: &str| l.trim_start().starts_with('[');
+    let start = match lines.iter().position(|l| l.trim() == "[general]") {
+        Some(i) => i,
+        None => {
+            // A new table goes first, so keys above any other table stay put.
+            let at = lines.iter().position(|l| header(l)).unwrap_or(lines.len());
+            lines.insert(at, "[general]".into());
+            if at < lines.len() - 1 {
+                lines.insert(at + 1, String::new());
+            }
+            at
+        }
+    };
+    for (key, value) in pairs {
+        let end = lines[start + 1..]
+            .iter()
+            .position(|l| header(l))
+            .map_or(lines.len(), |i| start + 1 + i);
+        let line = format!("{key} = {value}");
+        let found = (start + 1..end).find(|&i| {
+            lines[i]
+                .split_once('=')
+                .is_some_and(|(k, _)| k.trim() == *key)
+        });
+        match found {
+            Some(i) => lines[i] = line,
+            None => {
+                // After the table's last key, before trailing blank lines.
+                let mut at = end;
+                while at > start + 1 && lines[at - 1].trim().is_empty() {
+                    at -= 1;
+                }
+                lines.insert(at, line);
+            }
+        }
+    }
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
 }
 
 /// Folder the pin menu's Save writes to.
@@ -249,5 +371,43 @@ mod tests {
         .unwrap();
         assert_eq!(f.general.actions_on_enter.unwrap().len(), 2);
         assert_eq!(f.colors.palette.unwrap(), vec!["#ff0000".to_string()]);
+    }
+
+    #[test]
+    fn default_keys_parse() {
+        let f: File = toml::from_str(
+            "[general]\ndefault-color = \"#00ff00\"\ndefault-size = 9\ndefault-view = \"fit\"\n",
+        )
+        .unwrap();
+        assert_eq!(f.general.default_view, Some(StartView::Fit));
+        assert_eq!(f.general.default_size, Some(9.0));
+    }
+
+    #[test]
+    fn general_keys_are_set_in_place() {
+        let pairs = [("default-size", "7".to_string())];
+        // Empty file: the table is made.
+        assert_eq!(
+            set_general_keys("", &pairs),
+            "[general]\ndefault-size = 7\n"
+        );
+        // A key that is there is replaced; comments and other tables stay.
+        let text = "# mine\n[general]\ndefault-size = 2 # old\ncopy-command = \"wl-copy\"\n\n[colors]\npalette = []\n";
+        assert_eq!(
+            set_general_keys(text, &pairs),
+            "# mine\n[general]\ndefault-size = 7\ncopy-command = \"wl-copy\"\n\n[colors]\npalette = []\n"
+        );
+        // A missing key goes at the end of [general], not into [colors].
+        let text = "[general]\ncopy-command = \"wl-copy\"\n\n[colors]\npalette = []\n";
+        assert_eq!(
+            set_general_keys(text, &pairs),
+            "[general]\ncopy-command = \"wl-copy\"\ndefault-size = 7\n\n[colors]\npalette = []\n"
+        );
+        // No [general] yet: it goes before the first table.
+        let text = "[colors]\npalette = []\n";
+        assert_eq!(
+            set_general_keys(text, &pairs),
+            "[general]\ndefault-size = 7\n\n[colors]\npalette = []\n"
+        );
     }
 }

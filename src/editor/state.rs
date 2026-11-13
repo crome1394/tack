@@ -5,12 +5,10 @@
 use super::doc::{Doc, Item, Pt, Rect, Rgba, Shape, Tool};
 use super::ring::Ring;
 use super::{effects, shapes};
-use crate::config::Settings;
+use crate::config::{Settings, StartView};
 use gtk::cairo::{Context, Format, ImageSurface};
 
-pub const SIZE_MIN: f64 = 1.0;
-pub const SIZE_MAX: f64 = 40.0;
-const SIZE_DEFAULT: f64 = 4.0;
+pub use crate::config::{SIZE_MAX, SIZE_MIN};
 const ZOOM_MIN: f64 = 0.05;
 const ZOOM_MAX: f64 = 16.0;
 /// A press that moves less than this (screen pixels) is a click.
@@ -92,25 +90,22 @@ impl Editor {
             .as_deref()
             .and_then(Tool::from_name)
             .unwrap_or(Tool::Arrow);
-        let color = settings
-            .palette
-            .first()
-            .and_then(|c| Rgba::parse(c))
-            .unwrap_or(Rgba::RED);
+        let color = Rgba::parse(&settings.color).unwrap_or(Rgba::RED);
+        let fit = settings.view == StartView::Fit;
         let measure_surface = ImageSurface::create(Format::ARgb32, 1, 1).expect("cairo surface");
         Editor {
             doc,
             tool,
             color,
-            size: SIZE_DEFAULT,
+            size: settings.size,
             fill: settings.fill_shapes,
             settings,
             view: View {
                 zoom: 1.0,
                 ox: 0.0,
                 oy: 0.0,
-                fit: false,
-                centered: true,
+                fit,
+                centered: !fit,
             },
             active: None,
             selected: None,
